@@ -10,6 +10,8 @@ const PORT = process.env.PORT || 3000;
 const BOT_TOKEN = process.env.TELEGRAM_API_TOKEN;
 const bot = new Telegraf(BOT_TOKEN);
 
+const yahooFinance = require("yahoo-finance2").default;
+
 // Command Handlers
 bot.start((ctx) =>
   ctx.reply(
@@ -25,20 +27,29 @@ bot.command("price", async (ctx) => {
   }
   const ticker = message[1].toUpperCase();
   try {
-    const response = await axios.get(
-      `https://finance.yahoo.com/quote/${ticker}`
-    );
-    // Simplified response parsing; use a proper finance API for production
-    const regex = /"regularMarketPrice":\{"raw":([\d.]+),"fmt":"([\d.]+)"/;
-    const match = response.data.match(regex);
-    if (match) {
-      const price = match[1];
-      ctx.reply(`The current price of ${ticker} is $${price}`);
+    // Fetch stock data using Yahoo Finance API
+    const stockData = await yahooFinance.quote(ticker);
+    console.log(stockData);
+
+    if (stockData && stockData.regularMarketPrice) {
+      const price = stockData.regularMarketPrice;
+      const changePercent = stockData.regularMarketChangePercent.toFixed(2);
+      const marketCap = stockData.marketCap
+        ? `$${(stockData.marketCap / 1e9).toFixed(2)}B`
+        : "N/A";
+
+      ctx.reply(
+        `📈 ${ticker} Stock Price:\n` +
+          `- Current Price: $${price}\n` +
+          `- Change: ${changePercent}%\n` +
+          `- Market Cap: ${marketCap}`
+      );
     } else {
       ctx.reply(`Could not fetch price for ${ticker}. Please try again.`);
     }
   } catch (error) {
-    ctx.reply(`Error fetching data: ${error.message}`);
+    console.error(error);
+    ctx.reply(`Error fetching data for ${ticker}: ${error.message}`);
   }
 });
 
